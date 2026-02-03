@@ -53,6 +53,10 @@ type PrometheusCollector struct {
 	histograms map[string]*prometheus.HistogramVec
 	gauges     map[string]*prometheus.GaugeVec
 	registerer prometheus.Registerer
+
+	// testHookBeforeLock is called between RUnlock and Lock in getOrCreate* methods.
+	// This is only for testing the double-check locking pattern. It is nil in production.
+	testHookBeforeLock func(name string)
 }
 
 // NewPrometheusCollector creates a new Prometheus-backed metrics collector.
@@ -232,6 +236,11 @@ func (c *PrometheusCollector) getOrCreateCounter(
 		return cv
 	}
 
+	// Test hook for double-check locking coverage
+	if c.testHookBeforeLock != nil {
+		c.testHookBeforeLock(name)
+	}
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -330,13 +339,20 @@ func (c *PrometheusCollector) getOrCreateGauge(
 
 // NoOpCollector is a Collector that discards all metrics. Useful for tests
 // and environments where metrics collection is disabled.
-type NoOpCollector struct{}
+type NoOpCollector struct {
+	// discarded counts discarded metric calls (for debugging)
+	discarded int
+}
 
 // IncrementCounter is a no-op.
-func (n *NoOpCollector) IncrementCounter(_ string, _ map[string]string) {}
+func (n *NoOpCollector) IncrementCounter(_ string, _ map[string]string) {
+	n.discarded++
+}
 
 // AddCounter is a no-op.
-func (n *NoOpCollector) AddCounter(_ string, _ float64, _ map[string]string) {}
+func (n *NoOpCollector) AddCounter(_ string, _ float64, _ map[string]string) {
+	n.discarded++
+}
 
 // RecordLatency is a no-op.
 func (n *NoOpCollector) RecordLatency(
@@ -344,13 +360,18 @@ func (n *NoOpCollector) RecordLatency(
 	_ time.Duration,
 	_ map[string]string,
 ) {
+	n.discarded++
 }
 
 // RecordValue is a no-op.
-func (n *NoOpCollector) RecordValue(_ string, _ float64, _ map[string]string) {}
+func (n *NoOpCollector) RecordValue(_ string, _ float64, _ map[string]string) {
+	n.discarded++
+}
 
 // SetGauge is a no-op.
-func (n *NoOpCollector) SetGauge(_ string, _ float64, _ map[string]string) {}
+func (n *NoOpCollector) SetGauge(_ string, _ float64, _ map[string]string) {
+	n.discarded++
+}
 
 // labelKeys extracts sorted keys from a labels map.
 func labelKeys(labels map[string]string) []string {

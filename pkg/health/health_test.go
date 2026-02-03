@@ -287,3 +287,242 @@ func TestAggregator_MixedStatuses(t *testing.T) {
 func TestAggregator_ImplementsChecker(t *testing.T) {
 	var _ Checker = &Aggregator{}
 }
+
+func TestTCPCheck(t *testing.T) {
+	tests := []struct {
+		name        string
+		address     string
+		ctx         func() context.Context
+		expectError bool
+		errorMatch  string
+	}{
+		{
+			name:    "with deadline - returns placeholder error",
+			address: "localhost:5432",
+			ctx: func() context.Context {
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				t.Cleanup(cancel)
+				return ctx
+			},
+			expectError: true,
+			errorMatch:  "TCPCheck is a placeholder",
+		},
+		{
+			name:    "without deadline - uses default 5s timeout",
+			address: "localhost:6379",
+			ctx: func() context.Context {
+				return context.Background()
+			},
+			expectError: true,
+			errorMatch:  "TCPCheck is a placeholder",
+		},
+		{
+			name:    "with expired context",
+			address: "localhost:8080",
+			ctx: func() context.Context {
+				ctx, cancel := context.WithDeadline(
+					context.Background(),
+					time.Now().Add(-1*time.Second),
+				)
+				t.Cleanup(cancel)
+				return ctx
+			},
+			expectError: true,
+			errorMatch:  "context already expired",
+		},
+		{
+			name:    "error includes address",
+			address: "db.example.com:3306",
+			ctx: func() context.Context {
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+				t.Cleanup(cancel)
+				return ctx
+			},
+			expectError: true,
+			errorMatch:  "db.example.com:3306",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			check := TCPCheck(tt.address)
+			err := check(tt.ctx())
+
+			if tt.expectError {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorMatch)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestBuildReport_DegradedStatus(t *testing.T) {
+	tests := []struct {
+		name           string
+		setupFunc      func(*Aggregator)
+		expectedStatus Status
+		description    string
+	}{
+		{
+			name: "degraded when optional component unhealthy",
+			setupFunc: func(agg *Aggregator) {
+				agg.Register("db", StaticCheck(nil))
+				agg.RegisterOptional("cache", StaticCheck(errors.New("cache unavailable")))
+			},
+			expectedStatus: StatusDegraded,
+			description:    "system should be degraded when optional fails",
+		},
+		{
+			name: "multiple optional unhealthy - still degraded",
+			setupFunc: func(agg *Aggregator) {
+				agg.Register("db", StaticCheck(nil))
+				agg.RegisterOptional("cache", StaticCheck(errors.New("cache down")))
+				agg.RegisterOptional("search", StaticCheck(errors.New("search down")))
+			},
+			expectedStatus: StatusDegraded,
+			description:    "multiple optional failures should be degraded",
+		},
+		{
+			name: "required healthy optional unhealthy mixed",
+			setupFunc: func(agg *Aggregator) {
+				agg.Register("db", StaticCheck(nil))
+				agg.Register("redis", StaticCheck(nil))
+				agg.RegisterOptional("metrics", StaticCheck(errors.New("metrics down")))
+				agg.RegisterOptional("logging", StaticCheck(nil))
+			},
+			expectedStatus: StatusDegraded,
+			description:    "mix of healthy optional and unhealthy optional",
+		},
+		{
+			name: "unhealthy takes precedence over degraded",
+			setupFunc: func(agg *Aggregator) {
+				// First add optional that would make it degraded
+				agg.RegisterOptional("cache", StaticCheck(errors.New("cache down")))
+				// Then add required that makes it unhealthy
+				agg.Register("db", StaticCheck(errors.New("db down")))
+			},
+			expectedStatus: StatusUnhealthy,
+			description:    "required failure overrides degraded from optional",
+		},
+		{
+			name: "order independent - required unhealthy last",
+			setupFunc: func(agg *Aggregator) {
+				agg.Register("db", StaticCheck(nil))
+				agg.RegisterOptional("cache", StaticCheck(errors.New("cache down")))
+				agg.Register("auth", StaticCheck(errors.New("auth down")))
+			},
+			expectedStatus: StatusUnhealthy,
+			description:    "required failure even when added last",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			agg := NewAggregator(nil)
+			tt.setupFunc(agg)
+
+			report := agg.Check(context.Background())
+			assert.Equal(t, tt.expectedStatus, report.Status, tt.description)
+		})
+	}
+}
+
+func TestBuildReport_ComponentDegradedStatus(t *testing.T) {
+	// Test when a component itself returns StatusDegraded
+	// This tests the else if branch in buildReport for StatusDegraded
+	agg := NewAggregator(nil)
+
+	// Create a custom check that simulates a component returning degraded status
+	// by using a check that returns an error, then manually manipulating for testing
+	// Since we can't directly return StatusDegraded from CheckFunc, we need to test
+	// the buildReport logic directly
+
+	// First test: verify that when components slice has a degraded result,
+	// the overall status becomes degraded
+	components := []component{
+		{name: "healthy-comp", check: StaticCheck(nil), required: true},
+	}
+	results := []ComponentResult{
+		{
+			Name:        "healthy-comp",
+			Status:      StatusDegraded,
+			Message:     "partially operational",
+			Duration:    10 * time.Millisecond,
+			LastChecked: time.Now(),
+		},
+	}
+
+	report := agg.buildReport(components, results)
+	assert.Equal(t, StatusDegraded, report.Status,
+		"component with degraded status should make overall status degraded")
+}
+
+func TestBuildReport_DegradedDoesNotOverrideUnhealthy(t *testing.T) {
+	agg := NewAggregator(nil)
+
+	// Test that once status is unhealthy, degraded doesn't change it back
+	components := []component{
+		{name: "required-failed", check: StaticCheck(nil), required: true},
+		{name: "degraded-comp", check: StaticCheck(nil), required: true},
+	}
+	results := []ComponentResult{
+		{
+			Name:        "required-failed",
+			Status:      StatusUnhealthy,
+			Message:     "connection refused",
+			Duration:    10 * time.Millisecond,
+			LastChecked: time.Now(),
+		},
+		{
+			Name:        "degraded-comp",
+			Status:      StatusDegraded,
+			Message:     "partial failure",
+			Duration:    10 * time.Millisecond,
+			LastChecked: time.Now(),
+		},
+	}
+
+	report := agg.buildReport(components, results)
+	assert.Equal(t, StatusUnhealthy, report.Status,
+		"unhealthy status should not be overridden by degraded")
+}
+
+func TestBuildReport_MultipleDegradedComponents(t *testing.T) {
+	agg := NewAggregator(nil)
+
+	// Test multiple components returning degraded status
+	components := []component{
+		{name: "comp1", check: StaticCheck(nil), required: true},
+		{name: "comp2", check: StaticCheck(nil), required: true},
+		{name: "comp3", check: StaticCheck(nil), required: false},
+	}
+	results := []ComponentResult{
+		{
+			Name:        "comp1",
+			Status:      StatusHealthy,
+			Duration:    10 * time.Millisecond,
+			LastChecked: time.Now(),
+		},
+		{
+			Name:        "comp2",
+			Status:      StatusDegraded,
+			Message:     "slow response",
+			Duration:    10 * time.Millisecond,
+			LastChecked: time.Now(),
+		},
+		{
+			Name:        "comp3",
+			Status:      StatusDegraded,
+			Message:     "cache miss rate high",
+			Duration:    10 * time.Millisecond,
+			LastChecked: time.Now(),
+		},
+	}
+
+	report := agg.buildReport(components, results)
+	assert.Equal(t, StatusDegraded, report.Status,
+		"multiple degraded components should result in degraded status")
+	assert.Len(t, report.Components, 3)
+}

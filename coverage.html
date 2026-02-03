@@ -55,7 +55,7 @@
 			<div id="nav">
 				<select id="files">
 				
-				<option value="file0">digital.vasic.observability/pkg/analytics/analytics.go (89.4%)</option>
+				<option value="file0">digital.vasic.observability/pkg/analytics/analytics.go (94.0%)</option>
 				
 				</select>
 			</div>
@@ -149,12 +149,30 @@ type ClickHouseConfig struct {
         Table string
 }
 
+// SQLOpener defines an interface for opening SQL database connections.
+// This allows for dependency injection during testing.
+type SQLOpener interface {
+        Open(driverName, dataSourceName string) (*sql.DB, error)
+}
+
+// DefaultSQLOpener is the default implementation using database/sql.
+type DefaultSQLOpener struct{}
+
+// Open opens a database connection using the standard sql.Open.
+func (d DefaultSQLOpener) Open(driverName, dataSourceName string) (*sql.DB, error) <span class="cov8" title="1">{
+        return sql.Open(driverName, dataSourceName)
+}</span>
+
+// defaultOpener is the package-level opener used by NewClickHouseCollector.
+var defaultOpener SQLOpener = DefaultSQLOpener{}
+
 // ClickHouseCollector implements Collector using ClickHouse for storage.
 type ClickHouseCollector struct {
         conn   *sql.DB
         logger *logrus.Logger
         config ClickHouseConfig
         mu     sync.RWMutex
+        opener SQLOpener // injected for testing; if nil, uses defaultOpener
 }
 
 // NewClickHouseCollector creates a ClickHouse-backed analytics collector.
@@ -162,8 +180,22 @@ func NewClickHouseCollector(
         config ClickHouseConfig,
         logger *logrus.Logger,
 ) (*ClickHouseCollector, error) <span class="cov8" title="1">{
+        return NewClickHouseCollectorWithOpener(config, logger, nil)
+}</span>
+
+// NewClickHouseCollectorWithOpener creates a ClickHouse-backed analytics
+// collector with a custom SQL opener (for testing).
+func NewClickHouseCollectorWithOpener(
+        config ClickHouseConfig,
+        logger *logrus.Logger,
+        opener SQLOpener,
+) (*ClickHouseCollector, error) <span class="cov8" title="1">{
         if logger == nil </span><span class="cov8" title="1">{
                 logger = logrus.New()
+        }</span>
+
+        <span class="cov8" title="1">if opener == nil </span><span class="cov8" title="1">{
+                opener = defaultOpener
         }</span>
 
         <span class="cov8" title="1">dsn := fmt.Sprintf("clickhouse://%s:%s@%s:%d/%s",
@@ -178,8 +210,8 @@ func NewClickHouseCollector(
                 dsn += "?secure=false"
         }</span>
 
-        <span class="cov8" title="1">conn, err := sql.Open("clickhouse", dsn)
-        if err != nil </span><span class="cov0" title="0">{
+        <span class="cov8" title="1">conn, err := opener.Open("clickhouse", dsn)
+        if err != nil </span><span class="cov8" title="1">{
                 return nil, fmt.Errorf("failed to open ClickHouse connection: %w", err)
         }</span>
 
@@ -188,7 +220,7 @@ func NewClickHouseCollector(
                 return nil, fmt.Errorf("failed to ping ClickHouse: %w", err)
         }</span>
 
-        <span class="cov0" title="0">logger.WithFields(logrus.Fields{
+        <span class="cov8" title="1">logger.WithFields(logrus.Fields{
                 "host":     config.Host,
                 "port":     config.Port,
                 "database": config.Database,
@@ -198,6 +230,7 @@ func NewClickHouseCollector(
                 conn:   conn,
                 logger: logger,
                 config: config,
+                opener: opener,
         }, nil</span>
 }
 
@@ -222,7 +255,7 @@ func (c *ClickHouseCollector) TrackBatch(
         table := c.config.Table
         c.mu.RUnlock()
 
-        if table == "" </span><span class="cov0" title="0">{
+        if table == "" </span><span class="cov8" title="1">{
                 table = "events"
         }</span>
 
@@ -245,7 +278,7 @@ func (c *ClickHouseCollector) TrackBatch(
 
         <span class="cov8" title="1">for _, event := range events </span><span class="cov8" title="1">{
                 ts := event.Timestamp
-                if ts.IsZero() </span><span class="cov0" title="0">{
+                if ts.IsZero() </span><span class="cov8" title="1">{
                         ts = time.Now()
                 }</span>
                 <span class="cov8" title="1">_, err := stmt.ExecContext(ctx,

@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
@@ -455,4 +456,416 @@ func TestTracer_NestedSpans(t *testing.T) {
 		parentStub.SpanContext.SpanID(),
 		childStub.Parent.SpanID(),
 	)
+}
+
+func TestInitTracer_OTLPExporterTypes(t *testing.T) {
+	// Test OTLP, Jaeger, Zipkin exporter types
+	// These will fail to connect but exercise the setupOTLPExporter code path
+	tests := []struct {
+		name         string
+		exporterType ExporterType
+		endpoint     string
+		insecure     bool
+		headers      map[string]string
+	}{
+		{
+			name:         "OTLP exporter",
+			exporterType: ExporterOTLP,
+			endpoint:     "localhost:4318",
+			insecure:     true,
+			headers:      nil,
+		},
+		{
+			name:         "Jaeger exporter via OTLP",
+			exporterType: ExporterJaeger,
+			endpoint:     "localhost:4317",
+			insecure:     true,
+			headers:      nil,
+		},
+		{
+			name:         "Zipkin exporter via OTLP",
+			exporterType: ExporterZipkin,
+			endpoint:     "localhost:9411",
+			insecure:     true,
+			headers:      nil,
+		},
+		{
+			name:         "OTLP with headers",
+			exporterType: ExporterOTLP,
+			endpoint:     "localhost:4318",
+			insecure:     true,
+			headers:      map[string]string{"Authorization": "Bearer token"},
+		},
+		{
+			name:         "OTLP secure",
+			exporterType: ExporterOTLP,
+			endpoint:     "localhost:4318",
+			insecure:     false,
+			headers:      nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &TracerConfig{
+				ServiceName:    "test-service",
+				ServiceVersion: "1.0.0",
+				Environment:    "test",
+				ExporterType:   tt.exporterType,
+				Endpoint:       tt.endpoint,
+				SampleRate:     1.0,
+				Insecure:       tt.insecure,
+				Headers:        tt.headers,
+			}
+
+			tr, err := InitTracer(cfg)
+			// These should succeed in creating the tracer even if the
+			// endpoint is not reachable, because OTLP exporters batch
+			// spans asynchronously
+			require.NoError(t, err)
+			require.NotNil(t, tr)
+			require.NoError(t, tr.Shutdown(context.Background()))
+		})
+	}
+}
+
+func TestBuildResource_EmptyEnvironment(t *testing.T) {
+	// Test buildResource with empty environment
+	cfg := &TracerConfig{
+		ServiceName:    "test",
+		ServiceVersion: "1.0.0",
+		Environment:    "", // Empty
+		ExporterType:   ExporterNone,
+		SampleRate:     1.0,
+	}
+
+	tr, err := InitTracer(cfg)
+	require.NoError(t, err)
+	require.NotNil(t, tr)
+	require.NoError(t, tr.Shutdown(context.Background()))
+}
+
+func TestSetupNoOpTracer_Direct(t *testing.T) {
+	// Test setupNoOpTracer directly via the public API with ExporterNone
+	cfg := &TracerConfig{
+		ServiceName:    "test-noop",
+		ServiceVersion: "2.0.0",
+		Environment:    "production",
+		ExporterType:   ExporterNone,
+		SampleRate:     0.0,
+	}
+
+	tr, err := InitTracer(cfg)
+	require.NoError(t, err)
+	require.NotNil(t, tr)
+
+	// Should still create spans but they won't be sampled
+	ctx, span := tr.StartSpan(context.Background(), "test-span")
+	span.End()
+	assert.NotNil(t, ctx)
+
+	require.NoError(t, tr.Shutdown(context.Background()))
+}
+
+func TestSetupNoOpTracer_WithEnvironment(t *testing.T) {
+	// Test setupNoOpTracer with environment set
+	cfg := &TracerConfig{
+		ServiceName:    "noop-env-test",
+		ServiceVersion: "1.0.0",
+		Environment:    "staging",
+		ExporterType:   ExporterNone,
+		SampleRate:     1.0,
+	}
+
+	tr, err := InitTracer(cfg)
+	require.NoError(t, err)
+	require.NotNil(t, tr)
+
+	// Verify provider is created
+	assert.NotNil(t, tr.Provider())
+	assert.Equal(t, cfg, tr.config)
+
+	require.NoError(t, tr.Shutdown(context.Background()))
+}
+
+func TestSetupNoOpTracer_EmptyEnvironment(t *testing.T) {
+	// Test setupNoOpTracer with empty environment
+	cfg := &TracerConfig{
+		ServiceName:    "noop-no-env",
+		ServiceVersion: "1.0.0",
+		Environment:    "",
+		ExporterType:   ExporterNone,
+		SampleRate:     1.0,
+	}
+
+	tr, err := InitTracer(cfg)
+	require.NoError(t, err)
+	require.NotNil(t, tr)
+
+	// Verify it still works without environment
+	ctx, span := tr.StartSpan(context.Background(), "test")
+	span.End()
+	assert.NotNil(t, ctx)
+
+	require.NoError(t, tr.Shutdown(context.Background()))
+}
+
+func TestInitTracer_EmptyStringExporterType(t *testing.T) {
+	// Test that empty string exporter type is treated as ExporterNone
+	cfg := &TracerConfig{
+		ServiceName:    "empty-exporter",
+		ServiceVersion: "1.0.0",
+		Environment:    "test",
+		ExporterType:   "",
+		SampleRate:     1.0,
+	}
+
+	tr, err := InitTracer(cfg)
+	require.NoError(t, err)
+	require.NotNil(t, tr)
+	require.NoError(t, tr.Shutdown(context.Background()))
+}
+
+func TestBuildResource_WithEnvironment(t *testing.T) {
+	// Test buildResource with environment attribute
+	cfg := &TracerConfig{
+		ServiceName:    "resource-test",
+		ServiceVersion: "1.0.0",
+		Environment:    "production",
+		ExporterType:   ExporterNone,
+		SampleRate:     1.0,
+	}
+
+	tr, err := InitTracer(cfg)
+	require.NoError(t, err)
+	require.NotNil(t, tr)
+	require.NoError(t, tr.Shutdown(context.Background()))
+}
+
+func TestBuildResource_WithoutEnvironment(t *testing.T) {
+	// Test buildResource without environment attribute (empty string)
+	cfg := &TracerConfig{
+		ServiceName:    "resource-no-env",
+		ServiceVersion: "2.0.0",
+		Environment:    "",
+		ExporterType:   ExporterNone,
+		SampleRate:     1.0,
+	}
+
+	tr, err := InitTracer(cfg)
+	require.NoError(t, err)
+	require.NotNil(t, tr)
+	require.NoError(t, tr.Shutdown(context.Background()))
+}
+
+func TestBuildResourceForTesting(t *testing.T) {
+	// Test BuildResourceForTesting helper
+	cfg := &TracerConfig{
+		ServiceName:    "test",
+		ServiceVersion: "1.0.0",
+		Environment:    "test",
+	}
+
+	res, err := BuildResourceForTesting(cfg)
+	require.NoError(t, err)
+	require.NotNil(t, res)
+}
+
+func TestBuildResourceForTesting_NoEnvironment(t *testing.T) {
+	cfg := &TracerConfig{
+		ServiceName:    "test",
+		ServiceVersion: "1.0.0",
+		Environment:    "",
+	}
+
+	res, err := BuildResourceForTesting(cfg)
+	require.NoError(t, err)
+	require.NotNil(t, res)
+}
+
+func TestInitTracer_StdoutExporter_WithEnvironment(t *testing.T) {
+	// Test stdout exporter with buildResource having environment
+	cfg := &TracerConfig{
+		ServiceName:    "stdout-env-test",
+		ServiceVersion: "1.0.0",
+		Environment:    "development",
+		ExporterType:   ExporterStdout,
+		SampleRate:     1.0,
+	}
+
+	tr, err := InitTracer(cfg)
+	require.NoError(t, err)
+	require.NotNil(t, tr)
+	require.NoError(t, tr.Shutdown(context.Background()))
+}
+
+func TestInitTracer_StdoutExporter_WithoutEnvironment(t *testing.T) {
+	// Test stdout exporter with buildResource without environment
+	cfg := &TracerConfig{
+		ServiceName:    "stdout-no-env",
+		ServiceVersion: "1.0.0",
+		Environment:    "",
+		ExporterType:   ExporterStdout,
+		SampleRate:     1.0,
+	}
+
+	tr, err := InitTracer(cfg)
+	require.NoError(t, err)
+	require.NotNil(t, tr)
+	require.NoError(t, tr.Shutdown(context.Background()))
+}
+
+func TestSetTestExporterFactory(t *testing.T) {
+	// Test that SetTestExporterFactory sets and resets the factory
+	defer SetTestExporterFactory(nil) // Clean up after test
+
+	called := false
+	factory := func(_ *TracerConfig) (sdktrace.SpanExporter, error) {
+		called = true
+		return tracetest.NewInMemoryExporter(), nil
+	}
+
+	SetTestExporterFactory(factory)
+
+	cfg := &TracerConfig{
+		ServiceName:    "factory-test",
+		ServiceVersion: "1.0.0",
+		Environment:    "test",
+		ExporterType:   ExporterOTLP, // Would normally try OTLP
+		Endpoint:       "localhost:4318",
+		SampleRate:     1.0,
+	}
+
+	tr, err := InitTracer(cfg)
+	require.NoError(t, err)
+	require.NotNil(t, tr)
+	assert.True(t, called, "custom exporter factory should have been called")
+	require.NoError(t, tr.Shutdown(context.Background()))
+}
+
+func TestSetTestResourceFactory(t *testing.T) {
+	// Test that SetTestResourceFactory sets and resets the factory
+	defer SetTestResourceFactory(nil) // Clean up after test
+
+	called := false
+	factory := func(cfg *TracerConfig) (*resource.Resource, error) {
+		called = true
+		return buildResource(cfg)
+	}
+
+	SetTestResourceFactory(factory)
+
+	cfg := &TracerConfig{
+		ServiceName:    "resource-factory-test",
+		ServiceVersion: "1.0.0",
+		Environment:    "test",
+		ExporterType:   ExporterStdout,
+		SampleRate:     1.0,
+	}
+
+	tr, err := InitTracer(cfg)
+	require.NoError(t, err)
+	require.NotNil(t, tr)
+	assert.True(t, called, "custom resource factory should have been called")
+	require.NoError(t, tr.Shutdown(context.Background()))
+}
+
+func TestInitTracer_ExporterFactoryError(t *testing.T) {
+	// Test that exporter factory errors are properly returned
+	defer SetTestExporterFactory(nil) // Clean up after test
+
+	expectedErr := errors.New("exporter creation failed")
+	SetTestExporterFactory(func(_ *TracerConfig) (sdktrace.SpanExporter, error) {
+		return nil, expectedErr
+	})
+
+	cfg := &TracerConfig{
+		ServiceName:    "error-test",
+		ServiceVersion: "1.0.0",
+		ExporterType:   ExporterOTLP,
+		Endpoint:       "localhost:4318",
+		SampleRate:     1.0,
+	}
+
+	tr, err := InitTracer(cfg)
+	require.Error(t, err)
+	assert.Nil(t, tr)
+	assert.Contains(t, err.Error(), "failed to create exporter")
+}
+
+func TestInitTracer_ResourceFactoryError(t *testing.T) {
+	// Test that resource factory errors are properly returned
+	defer SetTestExporterFactory(nil)  // Clean up after test
+	defer SetTestResourceFactory(nil)  // Clean up after test
+
+	// First set a working exporter factory
+	SetTestExporterFactory(func(_ *TracerConfig) (sdktrace.SpanExporter, error) {
+		return tracetest.NewInMemoryExporter(), nil
+	})
+
+	// Then set a failing resource factory
+	expectedErr := errors.New("resource creation failed")
+	SetTestResourceFactory(func(_ *TracerConfig) (*resource.Resource, error) {
+		return nil, expectedErr
+	})
+
+	cfg := &TracerConfig{
+		ServiceName:    "resource-error-test",
+		ServiceVersion: "1.0.0",
+		ExporterType:   ExporterOTLP,
+		Endpoint:       "localhost:4318",
+		SampleRate:     1.0,
+	}
+
+	tr, err := InitTracer(cfg)
+	require.Error(t, err)
+	assert.Nil(t, tr)
+	assert.Contains(t, err.Error(), "failed to create resource")
+}
+
+func TestSetupNoOpTracer_ResourceFactoryError(t *testing.T) {
+	// Test that resource factory errors in setupNoOpTracer are properly returned
+	defer SetTestResourceFactory(nil)  // Clean up after test
+
+	// Set a failing resource factory
+	expectedErr := errors.New("resource creation failed for noop")
+	SetTestResourceFactory(func(_ *TracerConfig) (*resource.Resource, error) {
+		return nil, expectedErr
+	})
+
+	cfg := &TracerConfig{
+		ServiceName:    "noop-resource-error-test",
+		ServiceVersion: "1.0.0",
+		ExporterType:   ExporterNone, // This uses setupNoOpTracer
+		SampleRate:     1.0,
+	}
+
+	tr, err := InitTracer(cfg)
+	require.Error(t, err)
+	assert.Nil(t, tr)
+	assert.Contains(t, err.Error(), "failed to create resource")
+}
+
+func TestSetupNoOpTracer_WithResourceFactory(t *testing.T) {
+	// Test that setupNoOpTracer uses testResourceFactory when set
+	defer SetTestResourceFactory(nil)  // Clean up after test
+
+	called := false
+	SetTestResourceFactory(func(cfg *TracerConfig) (*resource.Resource, error) {
+		called = true
+		return buildResource(cfg)
+	})
+
+	cfg := &TracerConfig{
+		ServiceName:    "noop-factory-test",
+		ServiceVersion: "1.0.0",
+		ExporterType:   ExporterNone,
+		SampleRate:     1.0,
+	}
+
+	tr, err := InitTracer(cfg)
+	require.NoError(t, err)
+	require.NotNil(t, tr)
+	assert.True(t, called, "resource factory should have been called for noop tracer")
+	require.NoError(t, tr.Shutdown(context.Background()))
 }

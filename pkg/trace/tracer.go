@@ -75,6 +75,30 @@ type Tracer struct {
 	mu       sync.RWMutex
 }
 
+// ExporterFactory is a function type for creating span exporters.
+type ExporterFactory func(config *TracerConfig) (sdktrace.SpanExporter, error)
+
+// ResourceFactory is a function type for creating resources.
+type ResourceFactory func(config *TracerConfig) (*resource.Resource, error)
+
+// testExporterFactory allows overriding the exporter creation in tests.
+var testExporterFactory ExporterFactory
+
+// testResourceFactory allows overriding the resource creation in tests.
+var testResourceFactory ResourceFactory
+
+// SetTestExporterFactory sets a custom exporter factory for testing.
+// Call with nil to restore default behavior.
+func SetTestExporterFactory(f ExporterFactory) {
+	testExporterFactory = f
+}
+
+// SetTestResourceFactory sets a custom resource factory for testing.
+// Call with nil to restore default behavior.
+func SetTestResourceFactory(f ResourceFactory) {
+	testResourceFactory = f
+}
+
 // InitTracer creates and configures a new Tracer with the given config.
 // It sets up the exporter, resource, sampler, and registers the provider
 // as the global OpenTelemetry TracerProvider.
@@ -86,22 +110,33 @@ func InitTracer(config *TracerConfig) (*Tracer, error) {
 	var exporter sdktrace.SpanExporter
 	var err error
 
-	switch config.ExporterType {
-	case ExporterOTLP, ExporterJaeger, ExporterZipkin:
-		exporter, err = setupOTLPExporter(context.Background(), config)
-	case ExporterStdout:
-		exporter, err = stdouttrace.New(stdouttrace.WithPrettyPrint())
-	case ExporterNone, "":
-		return setupNoOpTracer(config)
-	default:
-		return nil, fmt.Errorf("unsupported exporter type: %s", config.ExporterType)
+	// Use test factory if set
+	if testExporterFactory != nil {
+		exporter, err = testExporterFactory(config)
+	} else {
+		switch config.ExporterType {
+		case ExporterOTLP, ExporterJaeger, ExporterZipkin:
+			exporter, err = setupOTLPExporter(context.Background(), config)
+		case ExporterStdout:
+			exporter, err = stdouttrace.New(stdouttrace.WithPrettyPrint())
+		case ExporterNone, "":
+			return setupNoOpTracer(config)
+		default:
+			return nil, fmt.Errorf("unsupported exporter type: %s", config.ExporterType)
+		}
 	}
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create exporter: %w", err)
 	}
 
-	res, err := buildResource(config)
+	// Use test resource factory if set
+	var res *resource.Resource
+	if testResourceFactory != nil {
+		res, err = testResourceFactory(config)
+	} else {
+		res, err = buildResource(config)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to create resource: %w", err)
 	}
@@ -315,7 +350,14 @@ func setupOTLPExporter(
 
 // setupNoOpTracer creates a tracer with NeverSample sampler.
 func setupNoOpTracer(config *TracerConfig) (*Tracer, error) {
-	res, err := buildResource(config)
+	var res *resource.Resource
+	var err error
+
+	if testResourceFactory != nil {
+		res, err = testResourceFactory(config)
+	} else {
+		res, err = buildResource(config)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to create resource: %w", err)
 	}
@@ -335,6 +377,11 @@ func setupNoOpTracer(config *TracerConfig) (*Tracer, error) {
 		),
 		config: config,
 	}, nil
+}
+
+// BuildResourceForTesting exposes buildResource for testing.
+func BuildResourceForTesting(config *TracerConfig) (*resource.Resource, error) {
+	return buildResource(config)
 }
 
 // buildResource creates an OpenTelemetry resource describing the service.
