@@ -1,0 +1,244 @@
+classDiagram
+    direction TB
+
+    %% trace package
+    class Tracer {
+        -provider *sdktrace.TracerProvider
+        -tracer trace.Tracer
+        -config *TracerConfig
+        -mu sync.RWMutex
+        +Shutdown(ctx context.Context) error
+        +StartSpan(ctx, name, attrs...) (context.Context, trace.Span)
+        +StartClientSpan(ctx, name, attrs...) (context.Context, trace.Span)
+        +StartInternalSpan(ctx, name, attrs...) (context.Context, trace.Span)
+        +TraceFunc(ctx, name, fn, attrs...) error
+        +TimedSpan(ctx, name, attrs...) (context.Context, func(error))
+        +Provider() *sdktrace.TracerProvider
+    }
+
+    class TracerConfig {
+        +ServiceName string
+        +ServiceVersion string
+        +Environment string
+        +ExporterType ExporterType
+        +Endpoint string
+        +SampleRate float64
+        +Headers map~string~string~
+        +Insecure bool
+    }
+
+    class ExporterType {
+        <<enumeration>>
+        ExporterStdout
+        ExporterOTLP
+        ExporterJaeger
+        ExporterZipkin
+        ExporterNone
+    }
+
+    Tracer --> TracerConfig : uses
+    TracerConfig --> ExporterType : selects
+
+    %% metrics package
+    class Collector {
+        <<interface>>
+        +IncrementCounter(name, labels)
+        +AddCounter(name, value, labels)
+        +RecordLatency(name, duration, labels)
+        +RecordValue(name, value, labels)
+        +SetGauge(name, value, labels)
+    }
+
+    class PrometheusCollector {
+        -config *PrometheusConfig
+        -mu sync.RWMutex
+        -counters map~string~*prometheus.CounterVec~
+        -histograms map~string~*prometheus.HistogramVec~
+        -gauges map~string~*prometheus.GaugeVec~
+        -registerer prometheus.Registerer
+        +RegisterCounter(name, help, labelNames) error
+        +RegisterHistogram(name, help, labelNames, buckets) error
+        +RegisterGauge(name, help, labelNames) error
+        +IncrementCounter(name, labels)
+        +AddCounter(name, value, labels)
+        +RecordLatency(name, duration, labels)
+        +RecordValue(name, value, labels)
+        +SetGauge(name, value, labels)
+    }
+
+    class PrometheusConfig {
+        +Namespace string
+        +Subsystem string
+        +DefaultBuckets []float64
+        +Registry prometheus.Registerer
+    }
+
+    class MetricsNoOpCollector {
+        +IncrementCounter(name, labels)
+        +AddCounter(name, value, labels)
+        +RecordLatency(name, duration, labels)
+        +RecordValue(name, value, labels)
+        +SetGauge(name, value, labels)
+    }
+
+    Collector <|.. PrometheusCollector : implements
+    Collector <|.. MetricsNoOpCollector : implements
+    PrometheusCollector --> PrometheusConfig : uses
+
+    %% logging package
+    class Logger {
+        <<interface>>
+        +Info(msg string)
+        +Warn(msg string)
+        +Error(msg string)
+        +Debug(msg string)
+        +WithField(key, value) Logger
+        +WithFields(fields) Logger
+        +WithCorrelationID(id) Logger
+        +WithError(err) Logger
+    }
+
+    class LogrusAdapter {
+        -logger *logrus.Entry
+        -mu sync.RWMutex
+        +Info(msg string)
+        +Warn(msg string)
+        +Error(msg string)
+        +Debug(msg string)
+        +WithField(key, value) Logger
+        +WithFields(fields) Logger
+        +WithCorrelationID(id) Logger
+        +WithError(err) Logger
+    }
+
+    class LoggingConfig {
+        +Level Level
+        +Format string
+        +Output io.Writer
+        +ServiceName string
+    }
+
+    class LoggingNoOpLogger {
+        +Info(msg string)
+        +Warn(msg string)
+        +Error(msg string)
+        +Debug(msg string)
+        +WithField(key, value) Logger
+        +WithFields(fields) Logger
+        +WithCorrelationID(id) Logger
+        +WithError(err) Logger
+    }
+
+    Logger <|.. LogrusAdapter : implements
+    Logger <|.. LoggingNoOpLogger : implements
+    LogrusAdapter --> LoggingConfig : uses
+
+    %% health package
+    class Checker {
+        <<interface>>
+        +Check(ctx context.Context) *Report
+    }
+
+    class Aggregator {
+        -mu sync.RWMutex
+        -components []component
+        -timeout time.Duration
+        +Register(name, check)
+        +RegisterOptional(name, check)
+        +Check(ctx) *Report
+        +ComponentCount() int
+    }
+
+    class AggregatorConfig {
+        +Timeout time.Duration
+    }
+
+    class Report {
+        +Status Status
+        +Components []ComponentResult
+        +Timestamp time.Time
+    }
+
+    class ComponentResult {
+        +Name string
+        +Status Status
+        +Message string
+        +Duration time.Duration
+        +LastChecked time.Time
+    }
+
+    class Status {
+        <<enumeration>>
+        StatusHealthy
+        StatusDegraded
+        StatusUnhealthy
+    }
+
+    Checker <|.. Aggregator : implements
+    Aggregator --> AggregatorConfig : uses
+    Aggregator --> Report : produces
+    Report --> ComponentResult : contains
+    Report --> Status : uses
+    ComponentResult --> Status : uses
+
+    %% analytics package
+    class AnalyticsCollector {
+        <<interface>>
+        +Track(ctx, event) error
+        +TrackBatch(ctx, events) error
+        +Query(ctx, table, groupBy, window) ([]AggregatedStats, error)
+        +Close() error
+    }
+
+    class ClickHouseCollector {
+        -conn *sql.DB
+        -logger *logrus.Logger
+        -config ClickHouseConfig
+        -mu sync.RWMutex
+        +Track(ctx, event) error
+        +TrackBatch(ctx, events) error
+        +Query(ctx, table, groupBy, window) ([]AggregatedStats, error)
+        +ExecuteReadQuery(ctx, query, args...) ([]map, error)
+        +Close() error
+    }
+
+    class ClickHouseConfig {
+        +Host string
+        +Port int
+        +Database string
+        +Username string
+        +Password string
+        +TLS bool
+        +Table string
+    }
+
+    class Event {
+        +Name string
+        +Timestamp time.Time
+        +Properties map~string~interface~
+        +Tags map~string~string~
+    }
+
+    class AggregatedStats {
+        +Group string
+        +TotalCount int64
+        +AvgDuration float64
+        +P95Duration float64
+        +P99Duration float64
+        +ErrorRate float64
+        +Period string
+        +Extra map~string~interface~
+    }
+
+    class AnalyticsNoOpCollector {
+        +Track(ctx, event) error
+        +TrackBatch(ctx, events) error
+        +Query(ctx, table, groupBy, window) ([]AggregatedStats, error)
+        +Close() error
+    }
+
+    AnalyticsCollector <|.. ClickHouseCollector : implements
+    AnalyticsCollector <|.. AnalyticsNoOpCollector : implements
+    ClickHouseCollector --> ClickHouseConfig : uses
+    ClickHouseCollector --> Event : stores
+    ClickHouseCollector --> AggregatedStats : returns

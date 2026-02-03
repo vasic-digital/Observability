@@ -1,0 +1,80 @@
+graph TB
+    subgraph "digital.vasic.observability"
+        subgraph "pkg/trace"
+            Tracer["Tracer"]
+            TracerConfig["TracerConfig"]
+            ExporterType["ExporterType"]
+        end
+
+        subgraph "pkg/metrics"
+            CollectorI["<<interface>><br/>Collector"]
+            PrometheusCollector["PrometheusCollector"]
+            PrometheusConfig["PrometheusConfig"]
+            MetricsNoOp["NoOpCollector"]
+        end
+
+        subgraph "pkg/logging"
+            LoggerI["<<interface>><br/>Logger"]
+            LogrusAdapter["LogrusAdapter"]
+            LoggingConfig["Config"]
+            LoggingNoOp["NoOpLogger"]
+        end
+
+        subgraph "pkg/health"
+            CheckerI["<<interface>><br/>Checker"]
+            Aggregator["Aggregator"]
+            AggregatorConfig["AggregatorConfig"]
+            CheckFunc["CheckFunc"]
+            Report["Report"]
+            ComponentResult["ComponentResult"]
+        end
+
+        subgraph "pkg/analytics"
+            AnalyticsCollectorI["<<interface>><br/>Collector"]
+            ClickHouseCollector["ClickHouseCollector"]
+            ClickHouseConfig["ClickHouseConfig"]
+            AnalyticsNoOp["NoOpCollector"]
+            Event["Event"]
+            AggregatedStats["AggregatedStats"]
+        end
+    end
+
+    subgraph "External Dependencies"
+        OTel["OpenTelemetry SDK"]
+        Prometheus["Prometheus client_golang"]
+        Logrus["Logrus"]
+        ClickHouse["ClickHouse Go Driver"]
+    end
+
+    subgraph "Backends"
+        OTLPCollector["OTLP Collector"]
+        Jaeger["Jaeger"]
+        Zipkin["Zipkin"]
+        Stdout["Stdout"]
+        PromServer["Prometheus Server"]
+        CHServer["ClickHouse Server"]
+    end
+
+    Tracer --> OTel
+    PrometheusCollector --> Prometheus
+    LogrusAdapter --> Logrus
+    ClickHouseCollector --> ClickHouse
+
+    PrometheusCollector -.->|implements| CollectorI
+    MetricsNoOp -.->|implements| CollectorI
+    LogrusAdapter -.->|implements| LoggerI
+    LoggingNoOp -.->|implements| LoggerI
+    Aggregator -.->|implements| CheckerI
+    ClickHouseCollector -.->|implements| AnalyticsCollectorI
+    AnalyticsNoOp -.->|implements| AnalyticsCollectorI
+
+    Tracer -->|ExporterOTLP| OTLPCollector
+    Tracer -->|ExporterJaeger| Jaeger
+    Tracer -->|ExporterZipkin| Zipkin
+    Tracer -->|ExporterStdout| Stdout
+    PrometheusCollector -->|scrape| PromServer
+    ClickHouseCollector -->|TCP| CHServer
+
+    Aggregator -->|"runs N checks"| CheckFunc
+    Aggregator -->|"produces"| Report
+    Report -->|"contains"| ComponentResult

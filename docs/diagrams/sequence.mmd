@@ -1,0 +1,65 @@
+sequenceDiagram
+    participant App as Application
+    participant Tracer as trace.Tracer
+    participant OTel as OpenTelemetry SDK
+    participant Exporter as Exporter (OTLP/Jaeger/Zipkin/Stdout)
+    participant Backend as Tracing Backend
+
+    Note over App,Backend: Initialization
+    App->>Tracer: InitTracer(config)
+    Tracer->>OTel: NewTracerProvider(batcher, resource, sampler)
+    Tracer->>OTel: SetTracerProvider(tp)
+    Tracer-->>App: *Tracer, nil
+
+    Note over App,Backend: Creating a Parent Span
+    App->>Tracer: StartSpan(ctx, "handle.request", attrs...)
+    Tracer->>OTel: tracer.Start(ctx, name, opts...)
+    OTel-->>Tracer: ctx_with_span, span
+    Tracer-->>App: ctx_with_span, span
+
+    Note over App,Backend: Creating a Child Span (context propagation)
+    App->>Tracer: StartClientSpan(ctx_with_span, "db.query", attrs...)
+    Tracer->>OTel: tracer.Start(ctx_with_span, name, SpanKindClient)
+    OTel-->>Tracer: ctx_child, child_span
+    Note right of OTel: child_span.parent = span from ctx
+    Tracer-->>App: ctx_child, child_span
+
+    Note over App,Backend: TraceFunc (automatic span lifecycle)
+    App->>Tracer: TraceFunc(ctx, "compute", fn, attrs...)
+    Tracer->>OTel: tracer.Start(ctx, "compute")
+    OTel-->>Tracer: ctx_fn, fn_span
+    Tracer->>App: fn(ctx_fn)
+    App-->>Tracer: error or nil
+    alt error returned
+        Tracer->>OTel: span.RecordError(err)
+        Tracer->>OTel: span.SetStatus(Error, msg)
+    else success
+        Tracer->>OTel: span.SetStatus(Ok, "")
+    end
+    Tracer->>OTel: fn_span.End()
+    Tracer-->>App: error
+
+    Note over App,Backend: TimedSpan (duration recording)
+    App->>Tracer: TimedSpan(ctx, "slow.op")
+    Tracer->>Tracer: start = time.Now()
+    Tracer->>OTel: tracer.Start(ctx, "slow.op")
+    OTel-->>Tracer: ctx_timed, timed_span
+    Tracer-->>App: ctx_timed, finish_func
+
+    App->>App: ... do work ...
+    App->>Tracer: finish_func(err)
+    Tracer->>OTel: span.SetAttributes(duration_seconds)
+    Tracer->>OTel: EndSpanWithError(span, err)
+
+    Note over App,Backend: Ending Spans and Export
+    App->>OTel: span.End()
+    OTel->>Exporter: batch export spans
+    Exporter->>Backend: send trace data
+
+    Note over App,Backend: Shutdown
+    App->>Tracer: Shutdown(ctx)
+    Tracer->>OTel: provider.Shutdown(ctx)
+    OTel->>Exporter: flush remaining spans
+    Exporter->>Backend: send final batch
+    OTel-->>Tracer: nil
+    Tracer-->>App: nil
