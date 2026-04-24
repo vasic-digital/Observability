@@ -20,7 +20,7 @@ import (
 
 func TestMetricsCollectorCounterAndGauge(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping integration test in short mode")
+		t.Skip("skipping integration test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	registry := prometheus.NewRegistry()
@@ -47,7 +47,7 @@ func TestMetricsCollectorCounterAndGauge(t *testing.T) {
 
 func TestMetricsRegisterAndUse(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping integration test in short mode")
+		t.Skip("skipping integration test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	registry := prometheus.NewRegistry()
@@ -72,7 +72,7 @@ func TestMetricsRegisterAndUse(t *testing.T) {
 
 func TestHealthAggregatorIntegration(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping integration test in short mode")
+		t.Skip("skipping integration test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	agg := health.NewAggregator(&health.AggregatorConfig{
@@ -100,7 +100,7 @@ func TestHealthAggregatorIntegration(t *testing.T) {
 
 func TestLoggerWithCorrelationID(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping integration test in short mode")
+		t.Skip("skipping integration test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	var buf bytes.Buffer
@@ -129,7 +129,7 @@ func TestLoggerWithCorrelationID(t *testing.T) {
 
 func TestContextCorrelationID(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping integration test in short mode")
+		t.Skip("skipping integration test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	ctx := context.Background()
@@ -154,7 +154,7 @@ func TestContextCorrelationID(t *testing.T) {
 
 func TestTracerInitAndShutdown(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping integration test in short mode")
+		t.Skip("skipping integration test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	tracer, err := trace.InitTracer(&trace.TracerConfig{
@@ -178,7 +178,7 @@ func TestTracerInitAndShutdown(t *testing.T) {
 
 func TestNoOpCollectors(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping integration test in short mode")
+		t.Skip("skipping integration test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	noopMetrics := &metrics.NoOpCollector{}
