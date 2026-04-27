@@ -21,7 +21,7 @@ import (
 
 func TestSecurity_NilMetricLabels(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping security test in short mode")
+		t.Skip("skipping security test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	registry := prometheus.NewRegistry()
@@ -41,7 +41,7 @@ func TestSecurity_NilMetricLabels(t *testing.T) {
 
 func TestSecurity_DuplicateRegistration(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping security test in short mode")
+		t.Skip("skipping security test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	registry := prometheus.NewRegistry()
@@ -59,7 +59,7 @@ func TestSecurity_DuplicateRegistration(t *testing.T) {
 
 func TestSecurity_HealthCheckTimeout(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping security test in short mode")
+		t.Skip("skipping security test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	agg := health.NewAggregator(&health.AggregatorConfig{
@@ -87,7 +87,7 @@ func TestSecurity_HealthCheckTimeout(t *testing.T) {
 
 func TestSecurity_LoggerLargeInput(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping security test in short mode")
+		t.Skip("skipping security test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	var buf bytes.Buffer
@@ -106,7 +106,7 @@ func TestSecurity_LoggerLargeInput(t *testing.T) {
 
 func TestSecurity_TracerNilSpanHelpers(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping security test in short mode")
+		t.Skip("skipping security test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	assert.NotPanics(t, func() {
@@ -119,7 +119,7 @@ func TestSecurity_TracerNilSpanHelpers(t *testing.T) {
 
 func TestSecurity_AnalyticsSQLInjection(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping security test in short mode")
+		t.Skip("skipping security test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	noopCollector := analytics.NewCollector(nil, nil)
@@ -130,7 +130,7 @@ func TestSecurity_AnalyticsSQLInjection(t *testing.T) {
 
 func TestSecurity_LoggerNilError(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping security test in short mode")
+		t.Skip("skipping security test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	var buf bytes.Buffer
@@ -147,7 +147,7 @@ func TestSecurity_LoggerNilError(t *testing.T) {
 
 func TestSecurity_EmptyCorrelationID(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping security test in short mode")
+		t.Skip("skipping security test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	ctx := context.Background()
@@ -161,7 +161,7 @@ func TestSecurity_EmptyCorrelationID(t *testing.T) {
 
 func TestSecurity_TracerDefaultConfig(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping security test in short mode")
+		t.Skip("skipping security test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	tracer, err := trace.InitTracer(nil)

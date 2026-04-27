@@ -19,7 +19,7 @@ import (
 
 func TestE2E_FullObservabilityStack(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping e2e test in short mode")
+		t.Skip("skipping e2e test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	registry := prometheus.NewRegistry()
@@ -72,7 +72,7 @@ func TestE2E_FullObservabilityStack(t *testing.T) {
 
 func TestE2E_TracerSpanHierarchy(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping e2e test in short mode")
+		t.Skip("skipping e2e test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	tracer, err := trace.InitTracer(&trace.TracerConfig{
@@ -96,7 +96,7 @@ func TestE2E_TracerSpanHierarchy(t *testing.T) {
 
 func TestE2E_TraceFuncWithError(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping e2e test in short mode")
+		t.Skip("skipping e2e test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	tracer, err := trace.InitTracer(&trace.TracerConfig{
@@ -122,7 +122,7 @@ func TestE2E_TraceFuncWithError(t *testing.T) {
 
 func TestE2E_HealthCheckMixedComponents(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping e2e test in short mode")
+		t.Skip("skipping e2e test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	agg := health.NewAggregator(&health.AggregatorConfig{
@@ -158,7 +158,7 @@ func TestE2E_HealthCheckMixedComponents(t *testing.T) {
 
 func TestE2E_LoggerLevelFiltering(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping e2e test in short mode")
+		t.Skip("skipping e2e test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	var buf bytes.Buffer
@@ -182,7 +182,7 @@ func TestE2E_LoggerLevelFiltering(t *testing.T) {
 
 func TestE2E_TimedSpan(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping e2e test in short mode")
+		t.Skip("skipping e2e test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	tracer, err := trace.InitTracer(&trace.TracerConfig{
@@ -205,7 +205,7 @@ func TestE2E_TimedSpan(t *testing.T) {
 
 func TestE2E_HealthCheckRequiredFailure(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping e2e test in short mode")
+		t.Skip("skipping e2e test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	agg := health.NewAggregator(nil)

@@ -22,7 +22,7 @@ import (
 
 func TestStress_ConcurrentMetricsCollection(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping stress test in short mode")
+		t.Skip("skipping stress test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	registry := prometheus.NewRegistry()
@@ -54,7 +54,7 @@ func TestStress_ConcurrentMetricsCollection(t *testing.T) {
 
 func TestStress_ConcurrentLogging(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping stress test in short mode")
+		t.Skip("skipping stress test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	var buf bytes.Buffer
@@ -85,7 +85,7 @@ func TestStress_ConcurrentLogging(t *testing.T) {
 
 func TestStress_ConcurrentHealthChecks(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping stress test in short mode")
+		t.Skip("skipping stress test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	agg := health.NewAggregator(&health.AggregatorConfig{
@@ -119,7 +119,7 @@ func TestStress_ConcurrentHealthChecks(t *testing.T) {
 
 func TestStress_ConcurrentTraceSpans(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping stress test in short mode")
+		t.Skip("skipping stress test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	tracer, err := trace.InitTracer(&trace.TracerConfig{
@@ -152,7 +152,7 @@ func TestStress_ConcurrentTraceSpans(t *testing.T) {
 
 func TestStress_ConcurrentContextCorrelation(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping stress test in short mode")
+		t.Skip("skipping stress test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	var buf bytes.Buffer
@@ -185,7 +185,7 @@ func TestStress_ConcurrentContextCorrelation(t *testing.T) {
 
 func TestStress_MetricsGatherUnderLoad(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping stress test in short mode")
+		t.Skip("skipping stress test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	registry := prometheus.NewRegistry()
