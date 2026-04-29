@@ -109,6 +109,7 @@ func TestPrometheusCollector_VeryLargeValues(t *testing.T) {
 }
 
 func TestPrometheusCollector_NegativeValues(t *testing.T) {
+	// bluff-scan: no-assert-ok (metric race/lifecycle smoke — must not panic on contended access)
 	t.Parallel()
 
 	_, cfg := newTestRegistry()
