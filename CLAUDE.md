@@ -261,39 +261,61 @@ commented-out showing FAIL).
 
 <!-- END anti-bluff-testing addendum (Article XI) -->
 
-<!-- BEGIN user-mandate forensic anchor (Article XI §11.9) -->
+<!-- BEGIN const035-strengthening-2026-04-29 -->
 
-## ⚠️ User-Mandate Forensic Anchor (Article XI §11.9 — 2026-04-29)
+## CONST-035 — End-User Usability Mandate (2026-04-29 strengthening)
 
-Inherited from the umbrella project. Verbatim user mandate:
+A test or Challenge that PASSES is a CLAIM that the tested behavior
+**works for the end user of the product**. The HelixAgent project
+has repeatedly hit the failure mode where every test ran green AND
+every Challenge reported PASS, yet most product features did not
+actually work — buggy challenge wrappers masked failed assertions,
+scripts checked file existence without executing the file,
+"reachability" tests tolerated timeouts, contracts were honest in
+advertising but broken in dispatch. **This MUST NOT recur.**
 
-> "We had been in position that all tests do execute with success
-> and all Challenges as well, but in reality the most of the
-> features does not work and can't be used! This MUST NOT be the
-> case and execution of tests and Challenges MUST guarantee the
-> quality, the completion and full usability by end users of the
-> product!"
+Every PASS result MUST guarantee:
 
-**The operative rule:** the bar for shipping is **not** "tests
-pass" but **"users can use the feature."**
+a. **Quality** — the feature behaves correctly under inputs an end
+   user will send, including malformed input, edge cases, and
+   concurrency that real workloads produce.
+b. **Completion** — the feature is wired end-to-end from public
+   API surface down to backing infrastructure, with no stub /
+   placeholder / "wired lazily later" gaps that silently 503.
+c. **Full usability** — a CLI agent / SDK consumer / direct curl
+   client following the documented model IDs, request shapes, and
+   endpoints SUCCEEDS without having to know which of N internal
+   aliases the dispatcher actually accepts.
 
-Every PASS in this codebase MUST carry positive evidence captured
-during execution that the feature works for the end user. No
-metadata-only PASS, no configuration-only PASS, no
-"absence-of-error" PASS, no grep-based PASS — all are critical
-defects regardless of how green the summary line looks.
+A passing test that doesn't certify all three is a **bluff** and
+MUST be tightened, or marked `t.Skip("...SKIP-OK: #<ticket>")`
+so absence of coverage is loud rather than silent.
 
-Tests and Challenges (HelixQA) are bound equally. A Challenge that
-scores PASS on a non-functional feature is the same class of
-defect as a unit test that does.
+### Bluff taxonomy (each pattern observed in HelixAgent and now forbidden)
 
-**No false-success results are tolerable.** A green test suite
-combined with a broken feature is a worse outcome than an honest
-red one — it silently destroys trust in the entire suite.
+- **Wrapper bluff** — assertions PASS but the wrapper's exit-code
+  logic is buggy, marking the run FAILED (or the inverse: assertions
+  FAIL but the wrapper swallows them). Every aggregating wrapper MUST
+  use a robust counter (`! grep -qs "|FAILED|" "$LOG"` style) —
+  never inline arithmetic on a command that prints AND exits
+  non-zero.
+- **Contract bluff** — the system advertises a capability but
+  rejects it in dispatch. Every advertised capability MUST be
+  exercised by a test or Challenge that actually invokes it.
+- **Structural bluff** — `check_file_exists "foo_test.go"` passes
+  if the file is present but doesn't run the test or assert anything
+  about its content. File-existence checks MUST be paired with at
+  least one functional assertion.
+- **Comment bluff** — a code comment promises a behavior the code
+  doesn't actually have. Documentation written before / about code
+  MUST be re-verified against the code on every change touching the
+  documented function.
+- **Skip bluff** — `t.Skip("not running yet")` without a
+  `SKIP-OK: #<ticket>` marker silently passes. Every skip needs the
+  marker; CI fails on bare skips.
 
-Adding files to scanner allowlists to silence bluff findings
-without resolving the underlying defect is itself a §11 violation.
+The taxonomy is illustrative, not exhaustive. Every Challenge or
+test added going forward MUST pass an honest self-review against
+this taxonomy before being committed.
 
-**Full text:** umbrella `CONSTITUTION.md` Article XI §11.9.
-
-<!-- END user-mandate forensic anchor (Article XI §11.9) -->
+<!-- END const035-strengthening-2026-04-29 -->
