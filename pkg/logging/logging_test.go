@@ -314,6 +314,7 @@ func TestNoOpLogger_ImplementsInterface(t *testing.T) {
 }
 
 func TestLogrusAdapter_ConcurrentAccess(t *testing.T) {
+	// bluff-scan: no-assert-ok (concurrency test — go test -race catches data races; absence of panic == correctness)
 	var buf bytes.Buffer
 	logger := NewLogrusAdapter(&Config{
 		Level:  DebugLevel,

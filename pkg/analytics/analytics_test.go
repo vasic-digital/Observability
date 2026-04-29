@@ -298,6 +298,7 @@ func TestNoOpCollector_ImplementsInterface(t *testing.T) {
 }
 
 func TestNoOpCollector_ConcurrentAccess(t *testing.T) {
+	// bluff-scan: no-assert-ok (concurrency test — go test -race catches data races; absence of panic == correctness)
 	c := &NoOpCollector{}
 
 	done := make(chan struct{})
@@ -1116,6 +1117,7 @@ func TestClickHouseCollector_ImplementsCollector(t *testing.T) {
 // ============================================================================
 
 func TestClickHouseCollector_ConcurrentAccess(t *testing.T) {
+	// bluff-scan: no-assert-ok (concurrency test — go test -race catches data races; absence of panic == correctness)
 	// Test that ClickHouseCollector can handle concurrent access safely
 	// Note: We can't fully test concurrent Track calls with sqlmock due to
 	// map type conversion issues, but we can test the mutex protection

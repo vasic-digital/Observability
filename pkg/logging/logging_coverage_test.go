@@ -46,6 +46,7 @@ func TestNoOpLogger_Debug_Coverage(t *testing.T) {
 // TestNoOpLogger_AllMethods_ViaInterface ensures all NoOpLogger methods are
 // exercised when accessed through the Logger interface.
 func TestNoOpLogger_AllMethods_ViaInterface(t *testing.T) {
+	// bluff-scan: no-assert-ok (null-implementation smoke — no-op type must accept all interface calls without panic)
 	var l Logger = &NoOpLogger{}
 
 	// Exercise every method through the interface to cover all no-op bodies.

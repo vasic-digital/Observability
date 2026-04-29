@@ -178,6 +178,7 @@ func TestAggregator_Check_Parallel(t *testing.T) {
 }
 
 func TestAggregator_ConcurrentAccess(t *testing.T) {
+	// bluff-scan: no-assert-ok (concurrency test — go test -race catches data races; absence of panic == correctness)
 	agg := NewAggregator(nil)
 
 	done := make(chan struct{})

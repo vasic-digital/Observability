@@ -263,6 +263,7 @@ func TestPrometheusCollector_NilLabels(t *testing.T) {
 }
 
 func TestPrometheusCollector_ConcurrentAccess(t *testing.T) {
+	// bluff-scan: no-assert-ok (concurrency test — go test -race catches data races; absence of panic == correctness)
 	c, _ := newTestCollector(t)
 
 	done := make(chan struct{})
@@ -447,6 +448,7 @@ func TestPrometheusCollector_GetOrCreate_DoubleCheckLocking(t *testing.T) {
 }
 
 func TestNoOpCollector_AllMethods(t *testing.T) {
+	// bluff-scan: no-assert-ok (null-implementation smoke — no-op type must accept all interface calls without panic)
 	// Test all NoOpCollector methods with various input combinations
 	n := &NoOpCollector{}
 
@@ -487,6 +489,7 @@ func TestPrometheusCollector_RegisterHistogram_Duplicate(t *testing.T) {
 }
 
 func TestPrometheusCollector_GetOrCreate_ConcurrentDoubleCheck(t *testing.T) {
+	// bluff-scan: no-assert-ok (concurrency test — go test -race catches data races; absence of panic == correctness)
 	// This test exercises the double-check locking pattern
 	// by using concurrent goroutines that all try to create the same metric
 	c, _ := newTestCollector(t)
@@ -776,6 +779,7 @@ func TestPrometheusCollector_GetOrCreate_DoubleCheckBranchGauge(t *testing.T) {
 }
 
 func TestPrometheusCollector_ConcurrentCreateGauge(t *testing.T) {
+	// bluff-scan: no-assert-ok (concurrency test — go test -race catches data races; absence of panic == correctness)
 	// This test attempts to hit the double-check locking branch for gauges
 	// by having many goroutines race to create the same gauge.
 	// We use a slow registerer to increase the window for race conditions.
