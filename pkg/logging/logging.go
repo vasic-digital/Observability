@@ -203,16 +203,10 @@ func WithContext(logger Logger, ctx context.Context) Logger {
 type NoOpLogger struct{}
 
 // Info is a no-op.
-func (n *NoOpLogger) Info(_ string) {}
-
-// Warn is a no-op.
-func (n *NoOpLogger) Warn(_ string) {}
-
-// Error is a no-op.
-func (n *NoOpLogger) Error(_ string) {}
-
-// Debug is a no-op.
-func (n *NoOpLogger) Debug(_ string) {}
+func (n *NoOpLogger) Info(_ string)  {} // intentionally empty: NoOpLogger discards all log levels
+func (n *NoOpLogger) Warn(_ string)  {} // intentionally empty: NoOpLogger discards all log levels
+func (n *NoOpLogger) Error(_ string) {} // intentionally empty: NoOpLogger discards all log levels
+func (n *NoOpLogger) Debug(_ string) {} // intentionally empty: NoOpLogger discards all log levels
 
 // WithField returns the same no-op logger.
 func (n *NoOpLogger) WithField(_ string, _ interface{}) Logger { return n }
