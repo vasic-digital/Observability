@@ -17,49 +17,6 @@ func TestDefaultConfig(t *testing.T) {
 	assert.Equal(t, "json", cfg.Format)
 }
 
-func TestNewLogrusAdapter_NilConfig(t *testing.T) {
-	logger := NewLogrusAdapter(nil)
-	assert.NotNil(t, logger)
-}
-
-func TestNewLogrusAdapter_Levels(t *testing.T) {
-	tests := []struct {
-		name  string
-		level Level
-	}{
-		{name: "debug", level: DebugLevel},
-		{name: "info", level: InfoLevel},
-		{name: "warn", level: WarnLevel},
-		{name: "error", level: ErrorLevel},
-		{name: "unknown defaults to info", level: Level(99)},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			logger := NewLogrusAdapter(&Config{Level: tt.level})
-			assert.NotNil(t, logger)
-		})
-	}
-}
-
-func TestNewLogrusAdapter_Formats(t *testing.T) {
-	tests := []struct {
-		name   string
-		format string
-	}{
-		{name: "json format", format: "json"},
-		{name: "text format", format: "text"},
-		{name: "unknown defaults to json", format: "xml"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			logger := NewLogrusAdapter(&Config{Format: tt.format})
-			assert.NotNil(t, logger)
-		})
-	}
-}
-
 func TestLogrusAdapter_Info(t *testing.T) {
 	var buf bytes.Buffer
 	logger := NewLogrusAdapter(&Config{

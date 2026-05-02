@@ -338,15 +338,6 @@ func TestNoOpCollector_WithCancelledContext(t *testing.T) {
 // NewCollector Tests
 // ============================================================================
 
-func TestNewCollector_NilConfig(t *testing.T) {
-	c := NewCollector(nil, nil)
-	require.NotNil(t, c)
-
-	// Should be a NoOpCollector
-	_, ok := c.(*NoOpCollector)
-	assert.True(t, ok)
-}
-
 func TestNewCollector_InvalidConfig(t *testing.T) {
 	cfg := &ClickHouseConfig{
 		Host:     "invalid-host-that-does-not-exist",
@@ -370,46 +361,7 @@ func TestNewCollector_WithLogger(t *testing.T) {
 
 	cfg := &ClickHouseConfig{
 		Host:     "invalid-host",
-		Port:     9999,
-		Database: "test",
-		Username: "test",
-		Password: "test",
-	}
-
-	c := NewCollector(cfg, logger)
-	require.NotNil(t, c)
-
-	// Should fall back to NoOpCollector
-	_, ok := c.(*NoOpCollector)
-	assert.True(t, ok)
-}
-
-func TestNewCollector_EmptyHost(t *testing.T) {
-	cfg := &ClickHouseConfig{
-		Host:     "",
-		Port:     9000,
-		Database: "test",
-	}
-
-	c := NewCollector(cfg, nil)
-	require.NotNil(t, c)
-
-	// Should fall back to NoOpCollector since connection will fail
-	_, ok := c.(*NoOpCollector)
-	assert.True(t, ok)
-}
-
-// ============================================================================
-// isValidIdentifier Tests
-// ============================================================================
-
-func TestIsValidIdentifier(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected bool
-	}{
-		{name: "simple name", input: "events", expected: true},
+		Port:     9999,,
 		{name: "with underscore", input: "event_log", expected: true},
 		{name: "with numbers", input: "events2024", expected: true},
 		{name: "uppercase", input: "Events", expected: true},

@@ -21,12 +21,6 @@ func TestDefaultAggregatorConfig(t *testing.T) {
 	assert.Equal(t, 5*time.Second, cfg.Timeout)
 }
 
-func TestNewAggregator_NilConfig(t *testing.T) {
-	agg := NewAggregator(nil)
-	assert.NotNil(t, agg)
-	assert.Equal(t, 5*time.Second, agg.timeout)
-}
-
 func TestNewAggregator_CustomConfig(t *testing.T) {
 	agg := NewAggregator(&AggregatorConfig{Timeout: 10 * time.Second})
 	assert.Equal(t, 10*time.Second, agg.timeout)

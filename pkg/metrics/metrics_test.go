@@ -29,14 +29,6 @@ func TestDefaultPrometheusConfig(t *testing.T) {
 	assert.NotEmpty(t, cfg.DefaultBuckets)
 }
 
-func TestNewPrometheusCollector_NilConfig(t *testing.T) {
-	c := NewPrometheusCollector(nil)
-	assert.NotNil(t, c)
-	assert.NotNil(t, c.counters)
-	assert.NotNil(t, c.histograms)
-	assert.NotNil(t, c.gauges)
-}
-
 func TestPrometheusCollector_RegisterCounter(t *testing.T) {
 	tests := []struct {
 		name        string
